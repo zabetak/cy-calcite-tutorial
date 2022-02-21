@@ -17,8 +17,10 @@
 package com.github.zabetak.calcite.tutorial;
 
 import org.apache.calcite.DataContext;
+import org.apache.calcite.adapter.enumerable.EnumerableConvention;
 import org.apache.calcite.adapter.enumerable.EnumerableInterpretable;
 import org.apache.calcite.adapter.enumerable.EnumerableRel;
+import org.apache.calcite.adapter.enumerable.EnumerableRules;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.config.CalciteConnectionProperty;
@@ -36,6 +38,7 @@ import org.apache.calcite.plan.volcano.VolcanoPlanner;
 import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
@@ -135,21 +138,20 @@ public class QueryProcessor {
     System.out.println("[Logical plan]");
     System.out.println(RelOptUtil.toString(logicalPlan));
     RelOptPlanner planner = cluster.getPlanner();
-    // TODO 18. Obtain the optimizer/planner from the cluster
-    // TODO 19. Add the necessary rules to the planner
-    // TODO 20. Request the type of the output plan (in this case we want a physical plan in
-    // EnumerableConvention) using the changeTraits method.
-    // TODO 21. Pass the resulting plan (with changed traits/properties) to planner#setRoot
-    // TODO 22. Start the optimization process to obtain the most efficient physical plan based on
-    // the provided rule set using the findBest method.
-    // TODO 23. Display the physical plan
-    // TODO 24. Try to understand why the CannotPlanException appears.
-    // TODO 25. Goto to LuceneTable class and complete the missing bits to make the exception
-    //  disappear
-    // TODO 26. Pass the enumerable physical plan to compile method to generate the Java code and
-    // obtain the executable plan.
-    // TODO 27. Try to understand why the UnsupportedOperationException.
-    // TODO 28. Add the necessary rules to the planner to avoid the exception.
+    planner.addRule(CoreRules.PROJECT_TO_CALC);
+    planner.addRule(CoreRules.FILTER_TO_CALC);
+    planner.addRule(EnumerableRules.ENUMERABLE_AGGREGATE_RULE);
+    planner.addRule(EnumerableRules.ENUMERABLE_SORT_RULE);
+    planner.addRule(EnumerableRules.ENUMERABLE_CALC_RULE);
+    planner.addRule(EnumerableRules.ENUMERABLE_JOIN_RULE);
+    planner.addRule(EnumerableRules.ENUMERABLE_TABLE_SCAN_RULE);
+    logicalPlan = planner.changeTraits(logicalPlan,
+        logicalPlan.getTraitSet().replace(EnumerableConvention.INSTANCE));
+    planner.setRoot(logicalPlan);
+    RelNode physicalPlan = planner.findBestExp();
+    System.out.println("[Physical plan]");
+    System.out.println(RelOptUtil.toString(physicalPlan));
+    return compile(root, physicalPlan);
     // Coding module II:
     // TODO 1. Implement the LuceneTableScan operator according to the instructions in the class.
     // TODO 2. Implement the LuceneTableScanRule operator according to the instructions in the class.
@@ -173,7 +175,6 @@ public class QueryProcessor {
     // TODO 8. Implement the LuceneFilterRule according to the instructions in the class.
     // TODO 9. Add the LuceneFilterRule to the planner, observer the physical plan and explain what
     // happens.
-    return compile(null, null);
   }
 
   private static RelOptCluster newCluster(RelDataTypeFactory factory) {
