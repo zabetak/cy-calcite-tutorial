@@ -22,6 +22,7 @@ import org.apache.calcite.adapter.enumerable.EnumerableInterpretable;
 import org.apache.calcite.adapter.enumerable.EnumerableRel;
 import org.apache.calcite.adapter.enumerable.EnumerableRules;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
+import org.apache.calcite.adapter.jdbc.JdbcSchema;
 import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.jdbc.CalciteSchema;
@@ -59,6 +60,8 @@ import com.github.zabetak.calcite.tutorial.indexer.DatasetLoader;
 import com.github.zabetak.calcite.tutorial.indexer.TpchTable;
 import com.github.zabetak.calcite.tutorial.rules.LuceneTableScanRule;
 import com.github.zabetak.calcite.tutorial.rules.LuceneToEnumerableConverterRule;
+
+import javax.sql.DataSource;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -118,6 +121,10 @@ public class QueryProcessor {
     }
     LuceneSchema luceneSchema = new LuceneSchema(luceneTables);
     root.add("lucene", luceneSchema);
+    String jdbcUrl = "jdbc:hsqldb:file:" + DatasetLoader.JDBC_HSQLDB_PATH;
+    DataSource dataSource = JdbcSchema.dataSource(jdbcUrl, "org.hsqldb.jdbc.JDBCDriver", "SA", "");
+    JdbcSchema jdbcSchema = JdbcSchema.create(root.plus(), "hyper", dataSource, null, null);
+    root.add("hyper", jdbcSchema);
     SqlParser parser = SqlParser.create(sqlQuery);
     SqlNode astNode = parser.parseQuery();
     System.out.println("[Parsed query]");
@@ -155,15 +162,6 @@ public class QueryProcessor {
     System.out.println("[Physical plan]");
     System.out.println(RelOptUtil.toString(physicalPlan));
     return compile(root, physicalPlan);
-    // Coding module III:
-    // TODO 1. Use the JdbcSchema class to create a data source for establishing connections to
-    //  HyperSQL. You can find the appropriate url, username, etc., to use in DatasetLoader.
-    // TODO 2. Create a JdbcSchema using one of the available static factory methods.
-    // Tip: you can turn CalciteSchema to SchemaPlus by calling the plus() method.
-    // TODO 3. Register the jdbc schema under the root with an appropriate name e.g., 'hyper'
-    // TODO 4. Run a query and explain what happens. Where are the data coming from?
-    // TODO 5. Do the appropriate changes to fetch data from both Lucene, and HyperSQL.
-    // TODO 6. Explain where is the JdbcConvention and where are the JdbcRules.
     // Coding module IV:
     // TODO 7. Implement the LuceneFilter operator according to the instructions in the class.
     // TODO 8. Implement the LuceneFilterRule according to the instructions in the class.
