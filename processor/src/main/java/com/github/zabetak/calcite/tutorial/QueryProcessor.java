@@ -20,6 +20,8 @@ import org.apache.calcite.DataContext;
 import org.apache.calcite.adapter.enumerable.EnumerableInterpretable;
 import org.apache.calcite.adapter.enumerable.EnumerableRel;
 import org.apache.calcite.adapter.java.JavaTypeFactory;
+import org.apache.calcite.config.CalciteConnectionConfig;
+import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.linq4j.Enumerable;
@@ -29,19 +31,37 @@ import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.volcano.VolcanoPlanner;
+import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.Bindable;
 import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.schema.Table;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlOperatorTable;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
+import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.validate.SqlValidator;
+import org.apache.calcite.sql.validate.SqlValidatorUtil;
+import org.apache.calcite.sql2rel.SqlToRelConverter;
+import org.apache.calcite.sql2rel.StandardConvertletTable;
+
+import com.github.zabetak.calcite.tutorial.indexer.DatasetLoader;
+import com.github.zabetak.calcite.tutorial.indexer.TpchTable;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Query processor for running TPC-H queries over Apache Lucene and HyperSQL.
@@ -79,33 +99,42 @@ public class QueryProcessor {
     System.out.println(sqlQuery);
 
     // Coding module I:
-    // TODO 1. Create the root schema and type factory
-    // TODO 2. Start creating the schema for Lucene by initializing an empty map to hold the tables
-    // TODO 3. Obtain a data type builder from the type factory and create the data type for each
-    // TPC-H table
-    // TODO 4. Create a LuceneTable for each TPC-H table and add it to the map created above.
-    // To find the index path (where the table is stored) check the DatasetLoader class.
-    // TODO 5. Create a schema for Lucene and pass in the map with the lucene tables.
-    // TODO 6. Register the lucene schema under the root with an appropriate name e.g., 'lucene'
-    // TODO 7. Create an SQL parser for the provided sql query
-    // TODO 8. Parse the query into an AST
-    // TODO 9. Print and check the AST
-    // TODO 10. Instantiate the catalog reader and configure it appropriately
-    //  - Start with the DEFAULT CalciteConnectionConfig but inspect what others options are
-    //  available cause you will need probably need to tune it a bit later on.
-    // TODO 11. Instantiate an SQL validator using available utilities (SqlValidatorUtil)
-    // - Use the standard operator table (find appropriate implementation of SqlOperatorTable)
-    // - Use the default validator config
-    // TODO 12. Validate the initial AST and store the valid AST in some variable
-    // TODO 13. Create the optimization cluster to maintain planning information
-    // TODO 14. Instantiate the converter of the AST to Logical plan and pass the appropriate
-    //  parameters:
-    // - No view expansion (use NOOP_EXPANDER)
-    // - Standard expression normalization (use StandardConvertletTable.INSTANCE)
-    // - Default configuration (SqlToRelConverter.config())
-    // TODO 15. Convert the valid AST and obtain the root relational expression
-    // TODO 16. Obtain the actual relational expression (RelNode) from the root
-    // TODO 17. Display the logical plan using the optimizer utilities (RelOptUtil) class
+    CalciteSchema root = CalciteSchema.createRootSchema(false);
+    RelDataTypeFactory typeFactory = new JavaTypeFactoryImpl();
+    Map<String, Table> luceneTables = new HashMap<>();
+    for (TpchTable table : TpchTable.values()) {
+      RelDataTypeFactory.Builder builder = typeFactory.builder();
+      for (TpchTable.Column column : table.columns) {
+        builder.add(column.name, typeFactory.createJavaType(column.type).getSqlTypeName());
+      }
+      RelDataType tableType = builder.build();
+      String indexPath = DatasetLoader.LUCENE_INDEX_PATH.resolve(table.name()).toString();
+      luceneTables.put(table.name(), new LuceneTable(indexPath, tableType));
+    }
+    LuceneSchema luceneSchema = new LuceneSchema(luceneTables);
+    root.add("lucene", luceneSchema);
+    SqlParser parser = SqlParser.create(sqlQuery);
+    SqlNode astNode = parser.parseQuery();
+    System.out.println("[Parsed query]");
+    System.out.println(astNode);
+    CalciteConnectionConfig readerConf = CalciteConnectionConfig.DEFAULT
+        .set(CalciteConnectionProperty.CASE_SENSITIVE, "false");
+    CalciteCatalogReader reader = new CalciteCatalogReader(root, Collections.emptyList(), typeFactory, readerConf);
+    SqlValidator sqlValidator = SqlValidatorUtil.newValidator(SqlStdOperatorTable.instance(),
+        reader,
+        typeFactory,
+        SqlValidator.Config.DEFAULT);
+    SqlNode validAst = sqlValidator.validate(astNode);
+    System.out.println("[Validated query]");
+    System.out.println(validAst);
+    RelOptCluster cluster = newCluster(typeFactory);
+    SqlToRelConverter sqlToRelConverter = new SqlToRelConverter(NOOP_EXPANDER, sqlValidator,
+        reader, cluster, StandardConvertletTable.INSTANCE, SqlToRelConverter.config());
+    RelRoot relRoot = sqlToRelConverter.convertQuery(validAst, false, true);
+    RelNode logicalPlan = relRoot.rel;
+    System.out.println("[Logical plan]");
+    System.out.println(RelOptUtil.toString(logicalPlan));
+    RelOptPlanner planner = cluster.getPlanner();
     // TODO 18. Obtain the optimizer/planner from the cluster
     // TODO 19. Add the necessary rules to the planner
     // TODO 20. Request the type of the output plan (in this case we want a physical plan in

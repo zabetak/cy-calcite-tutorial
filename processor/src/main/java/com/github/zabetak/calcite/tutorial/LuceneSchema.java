@@ -17,15 +17,14 @@
 package com.github.zabetak.calcite.tutorial;
 
 import org.apache.calcite.schema.Table;
+import org.apache.calcite.schema.impl.AbstractSchema;
 
 import java.util.Map;
 
 /**
  * Schema representing multiple Apache Lucene indexes.
  */
-public class LuceneSchema {
-  // TODO 1. Extend AbstractSchema
-  // TODO 2. Override getTableMap to specify the tables comprising the schema
+public class LuceneSchema extends AbstractSchema {
 
   private final Map<String, Table> tableMap;
 
@@ -33,4 +32,7 @@ public class LuceneSchema {
     this.tableMap = tableMap;
   }
 
+  @Override protected Map<String, Table> getTableMap() {
+    return tableMap;
+  }
 }
