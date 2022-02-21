@@ -16,8 +16,13 @@
  */
 package com.github.zabetak.calcite.tutorial.operators;
 
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rex.RexNode;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.Query;
 
 /**
@@ -26,16 +31,23 @@ import org.apache.lucene.search.Query;
  * The expression knows how to transform a filter condition in Calcite's {@link RexNode}
  * representation to the respective {@link Query} object in Lucene.
  */
-public class LuceneFilter {
-  // TODO 1. Extend Filter operator and add an appropriate constuctor
-  // TODO 2. What does the constructor need to ensure about the arguments?
-  // TODO 3. Implement Filter#copy method, everything you need is in the parameters of the method
-  // TODO 4. Implement LuceneRel interface
-  // TODO 5. Implement LuceneRel#implement method
-  // You have to call implement() to the input of this operator and combine the results. This
-  // operator does not know where is the Lucene index; you can obtain this information from the
-  // input.
-  // In order to obtain the query you have to transform the condition expressed as RexNode tree
-  // to a Lucene Query object. Use the RexToLuceneTranslator to do this.
-  // TODO 6. Complete the RexToLuceneTranslator to be able to transform a RexNode to a Query.
+public class LuceneFilter extends Filter implements LuceneRel {
+  public LuceneFilter(RelOptCluster cluster, RelTraitSet traits,
+      RelNode child, RexNode condition) {
+    super(cluster, traits, child, condition);
+  }
+
+  @Override public Filter copy(RelTraitSet traitSet, RelNode input, RexNode condition) {
+    return new LuceneFilter(getCluster(), traitSet, input, condition);
+  }
+
+  @Override public Result implement() {
+    Result childResult = ((LuceneRel) getInput()).implement();
+    Query newQuery = new BooleanQuery.Builder()
+        .add(childResult.query, BooleanClause.Occur.MUST)
+        .add(RexToLuceneTranslator.translate(this), BooleanClause.Occur.MUST)
+        .build();
+    return new Result(childResult.indexPath, newQuery);
+  }
+
 }

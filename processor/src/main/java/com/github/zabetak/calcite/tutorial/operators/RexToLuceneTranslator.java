@@ -17,7 +17,19 @@
 package com.github.zabetak.calcite.tutorial.operators;
 
 import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexTableInputRef;
+import org.apache.calcite.rex.RexVisitorImpl;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.lucene.document.IntPoint;
 import org.apache.lucene.search.Query;
+
+import java.util.Set;
 
 /**
  * Translate row expressions ({@link org.apache.calcite.rex.RexNode}) to Apache Lucene queries
@@ -26,26 +38,29 @@ import org.apache.lucene.search.Query;
  * The translator assumes the expression is in some normalized form. At its current state it cannot
  * translate arbitrary Calcite expressions.
  */
-public final class RexToLuceneTranslator {
-  // TODO 1. Extend RexVisitorImpl<Query> and call super with the right argument
-  // TODO 2. Override and implement visitCall
-  // TODO 3. Ensure call.getKind() corresponds to equals operator
-  // TODO 4. Obtain an input/column reference from left operand (0) and cast to RexInputRef
-  // TODO 5. Obtain literal from right operand (1) and cast to RexLiteral
-  // TODO 6. Obtain RelMetadataQuery from cluster
-  // TODO 7. Use RelMetadataQuery#getExpressionLineage on filter.getInput() to find the table column
-  // TODO 8. Obtain the first expression from the lineage and cast it to RexTableInputRef
-  // TODO 9. Obtain RelDataTypeField, which has the column name, using the information in
-  // RelTableInputRef (ask for help if you reach this point and get stuck)
-  // TODO 10. Check the data type is the INTEGER and create the appropriate Lucene
-  // query (use Lucene's IntPoint class)
-  // TODO 11. Throw assertion/exception if it happens to encounter an expression we cannot handle
-  // TODO 12. Remove the assertion error from translate and apply the translator to the filter
-  //  condition.
+public final class RexToLuceneTranslator extends RexVisitorImpl<Query> {
   private final Filter filter;
 
   private RexToLuceneTranslator(Filter filter) {
+    super(false);
     this.filter = filter;
+  }
+
+  @Override public Query visitCall(RexCall call) {
+    if(SqlKind.EQUALS.equals(call.getKind())){
+      RexInputRef ref = (RexInputRef) call.operands.get(0);
+      RexLiteral literal = (RexLiteral) call.operands.get(1);
+      RelMetadataQuery mq = filter.getCluster().getMetadataQuery();
+      Set<RexNode> lineage = mq.getExpressionLineage(filter.getInput(), ref);
+      RexTableInputRef tableInputRef = lineage.stream().findFirst().map(RexTableInputRef.class::cast).get();
+      RelDataTypeField column = tableInputRef.getTableRef()
+          .getTable()
+          .getRowType()
+          .getFieldList()
+          .get(tableInputRef.getIndex());
+      return IntPoint.newExactQuery(column.getName(), literal.getValueAs(Integer.class));
+    }
+    throw new IllegalStateException("Transformation not supported");
   }
 
   /**
@@ -53,6 +68,6 @@ public final class RexToLuceneTranslator {
    */
   public static Query translate(Filter filter) {
     RexToLuceneTranslator translator = new RexToLuceneTranslator(filter);
-    return null;
+    return filter.getCondition().accept(translator);
   }
 }

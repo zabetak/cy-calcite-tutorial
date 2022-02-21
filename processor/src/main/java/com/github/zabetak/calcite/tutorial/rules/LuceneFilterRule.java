@@ -16,9 +16,24 @@
  */
 package com.github.zabetak.calcite.tutorial.rules;
 
+import org.apache.calcite.plan.Convention;
+import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.convert.ConverterRule;
+import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.logical.LogicalFilter;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.type.SqlTypeName;
 
 import com.github.zabetak.calcite.tutorial.operators.LuceneFilter;
+import com.github.zabetak.calcite.tutorial.operators.LuceneRel;
+
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Rule to convert a {@link LogicalFilter} to a {@link LuceneFilter} if possible.
@@ -32,20 +47,39 @@ import com.github.zabetak.calcite.tutorial.operators.LuceneFilter;
  * A single equality operator with input reference on the left side and an integer literal on the
  * right side. The input reference should be resolvable to an actual column of the table.
  */
-public final class LuceneFilterRule {
-  // TODO 1. Extend ConverterRule and add the appropriate constructor
-  // TODO 2. Override ConverterRule#convert method and create a LuceneFilter
-  // Don't forget to set the appropriate convention for the newly created filter
-  // Don't forget to request the input to LuceneFilter to be in the same (LUCENE) convention
-  // If you are stuck open EnumerableFilterRule and try to implement convert in a similar fashion.
-  // If you are still stuck ask for help.
-  // TODO 3. Override ConverterRule#matches method and ensure condition is of the appropriate form:
-  // i) It is a RexCall
-  // ii) The operator is EQUALS
-  // iii) The left operand (0) is a input/column reference (RexInputRef)
-  // iv) The right operand (1) is a literal value (RexLiteral) and the type is INTEGER
-  // v) The input reference refers to table column; exploit RelMetadataQuery#getExpressionLineage
-  // for this purpose; if it is not null then the expression can be tracked down to a table column
-  // TODO 4. Create default rule configuration
+public final class LuceneFilterRule extends ConverterRule {
+  public LuceneFilterRule(Config config) {
+    super(config);
+  }
+
+  @Override public boolean matches(RelOptRuleCall call) {
+    Filter filter = call.rel(0);
+    if (filter.getCondition() instanceof RexCall) {
+      RexCall rx = (RexCall) filter.getCondition();
+      if (SqlKind.EQUALS.equals(rx.getKind()) &&
+          rx.operands.get(0) instanceof RexInputRef &&
+          rx.operands.get(1) instanceof RexLiteral) {
+        RelMetadataQuery mq = call.getMetadataQuery();
+        RexNode inputRef = rx.operands.get(0);
+        RexNode literal = rx.operands.get(1);
+        return SqlTypeName.INTEGER.equals(literal.getType().getSqlTypeName())
+            && mq.getExpressionLineage(filter.getInput(), inputRef) != null;
+      }
+    }
+    return false;
+  }
+
+  @Override public @Nullable RelNode convert(RelNode rel) {
+    Filter filter = (Filter) rel;
+    RelNode newChild = convert(filter.getInput(), filter.getInput().getTraitSet().replace(LuceneRel.LUCENE));
+    return new LuceneFilter(filter.getCluster(),
+        filter.getTraitSet().replace(LuceneRel.LUCENE),
+        newChild,
+        filter.getCondition());
+  }
+
+  public static final Config DEFAULT = Config.INSTANCE
+      .withConversion(LogicalFilter.class, Convention.NONE, LuceneRel.LUCENE, "LuceneFilterRule")
+      .withRuleFactory(LuceneFilterRule::new);
 
 }

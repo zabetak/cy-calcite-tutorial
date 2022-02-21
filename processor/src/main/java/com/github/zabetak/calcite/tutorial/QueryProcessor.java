@@ -58,6 +58,7 @@ import org.apache.calcite.sql2rel.StandardConvertletTable;
 
 import com.github.zabetak.calcite.tutorial.indexer.DatasetLoader;
 import com.github.zabetak.calcite.tutorial.indexer.TpchTable;
+import com.github.zabetak.calcite.tutorial.rules.LuceneFilterRule;
 import com.github.zabetak.calcite.tutorial.rules.LuceneTableScanRule;
 import com.github.zabetak.calcite.tutorial.rules.LuceneToEnumerableConverterRule;
 
@@ -155,6 +156,7 @@ public class QueryProcessor {
     planner.addRule(EnumerableRules.ENUMERABLE_JOIN_RULE);
     planner.addRule(LuceneTableScanRule.DEFAULT.toRule());
     planner.addRule(LuceneToEnumerableConverterRule.DEFAULT.toRule());
+    planner.addRule(LuceneFilterRule.DEFAULT.toRule());
     logicalPlan = planner.changeTraits(logicalPlan,
         logicalPlan.getTraitSet().replace(EnumerableConvention.INSTANCE));
     planner.setRoot(logicalPlan);
@@ -162,11 +164,6 @@ public class QueryProcessor {
     System.out.println("[Physical plan]");
     System.out.println(RelOptUtil.toString(physicalPlan));
     return compile(root, physicalPlan);
-    // Coding module IV:
-    // TODO 7. Implement the LuceneFilter operator according to the instructions in the class.
-    // TODO 8. Implement the LuceneFilterRule according to the instructions in the class.
-    // TODO 9. Add the LuceneFilterRule to the planner, observer the physical plan and explain what
-    // happens.
   }
 
   private static RelOptCluster newCluster(RelDataTypeFactory factory) {
