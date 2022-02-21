@@ -16,23 +16,30 @@
  */
 package com.github.zabetak.calcite.tutorial.rules;
 
+import org.apache.calcite.adapter.enumerable.EnumerableConvention;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.convert.ConverterRule;
+
 import com.github.zabetak.calcite.tutorial.operators.LuceneRel;
 import com.github.zabetak.calcite.tutorial.operators.LuceneToEnumerableConverter;
+
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Planner rule converting any kind of {@link LuceneRel} expression to
  * {@link org.apache.calcite.adapter.enumerable.EnumerableRel} by creating a
  * {@link LuceneToEnumerableConverter}.
  */
-public final class LuceneToEnumerableConverterRule {
-  // TODO 1. Extend ConverterRule and add constructor
-  // TODO 2. Implement convert method and leave empty for now.
-  // TODO 3. Create DEFAULT configuration for this rule.
-  // The rule should not match only one kind of operator but all of certain type. Find the
-  // appropriate interface.
-  // Pay attention to input and output convention and think what you want to achieve and why.
-  // If stuck look at the constructor of LuceneToEnumerableConverter for more inspiration.
-  // TODO 4. Continue with the implementation of the implement method. Should be trivial.
-  // TODO 5. Go back to the processor and register this rule to the planner.
+public final class LuceneToEnumerableConverterRule extends ConverterRule {
+  public LuceneToEnumerableConverterRule(Config config) {
+    super(config);
+  }
+
+  @Override public @Nullable RelNode convert(RelNode rel) {
+    return new LuceneToEnumerableConverter(rel);
+  }
+  public static final Config DEFAULT = Config.INSTANCE
+      .withConversion(LuceneRel.class, LuceneRel.LUCENE, EnumerableConvention.INSTANCE, "LuceneToEnumerableConverterRule")
+      .withRuleFactory(LuceneToEnumerableConverterRule::new);
 
 }

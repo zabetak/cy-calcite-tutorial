@@ -16,27 +16,42 @@
  */
 package com.github.zabetak.calcite.tutorial.rules;
 
+import org.apache.calcite.plan.Convention;
+import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 
+import com.github.zabetak.calcite.tutorial.LuceneTable;
+import com.github.zabetak.calcite.tutorial.operators.LuceneRel;
 import com.github.zabetak.calcite.tutorial.operators.LuceneTableScan;
+
+import org.checkerframework.checker.nullness.qual.Nullable;
+
+import java.util.Collections;
 
 /**
  * Rule to convert a {@link LogicalTableScan} to a {@link LuceneTableScan} if possible.
  * The expression can be converted to a {@link LuceneTableScan} if the table corresponds to a Lucene
  * index.
  */
-public final class LuceneTableScanRule {
-  // TODO 1. Extend Converter rule and add the appropriate constructor
-  // TODO 2. Implement convert method and leave empty for now
-  // TODO 3. Create default rule config starting from ConverterRule.Config.INSTANCE
-  // - Use withConversion method to i) specify which operator you want to match, ii) what should be
-  // the input convention, iii) what should be the output convention, iv) name of the rule
-  // - Use withRuleFactory method to indicate which method should be called to create the rule (hint
-  // lamda expression to the constructor).
-  // TODO 4. Continue with the implementation of the convert method.
-  // Check the class of the table is the appropriate one; if not return null
-  // Create a LuceneTableScan with the appropriate traitset. You need to change the convention.Do
-  // you remember how to change traits?You have seen it before
-  // TODO 5. Go back to the processor and register this rule to the planner.
+public final class LuceneTableScanRule extends ConverterRule {
+  public LuceneTableScanRule(Config config) {
+    super(config);
+  }
+
+  @Override public @Nullable RelNode convert(RelNode rel) {
+    LuceneTable tbl = rel.getTable().unwrap(LuceneTable.class);
+    if(tbl == null) {
+      return null;
+    }
+    return new LuceneTableScan(rel.getCluster(),
+        rel.getTraitSet().replace(LuceneRel.LUCENE),
+        Collections.emptyList(),
+        rel.getTable());
+  }
+  
+  public static final Config DEFAULT = Config.INSTANCE
+      .withConversion(LogicalTableScan.class, Convention.NONE, LuceneRel.LUCENE, "LuceneTableScanRule")
+      .withRuleFactory(LuceneTableScanRule::new);
 
 }

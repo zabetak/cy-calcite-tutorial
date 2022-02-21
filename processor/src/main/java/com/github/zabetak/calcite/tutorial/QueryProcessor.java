@@ -57,6 +57,8 @@ import org.apache.calcite.sql2rel.StandardConvertletTable;
 
 import com.github.zabetak.calcite.tutorial.indexer.DatasetLoader;
 import com.github.zabetak.calcite.tutorial.indexer.TpchTable;
+import com.github.zabetak.calcite.tutorial.rules.LuceneTableScanRule;
+import com.github.zabetak.calcite.tutorial.rules.LuceneToEnumerableConverterRule;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -144,7 +146,8 @@ public class QueryProcessor {
     planner.addRule(EnumerableRules.ENUMERABLE_SORT_RULE);
     planner.addRule(EnumerableRules.ENUMERABLE_CALC_RULE);
     planner.addRule(EnumerableRules.ENUMERABLE_JOIN_RULE);
-    planner.addRule(EnumerableRules.ENUMERABLE_TABLE_SCAN_RULE);
+    planner.addRule(LuceneTableScanRule.DEFAULT.toRule());
+    planner.addRule(LuceneToEnumerableConverterRule.DEFAULT.toRule());
     logicalPlan = planner.changeTraits(logicalPlan,
         logicalPlan.getTraitSet().replace(EnumerableConvention.INSTANCE));
     planner.setRoot(logicalPlan);
@@ -152,15 +155,6 @@ public class QueryProcessor {
     System.out.println("[Physical plan]");
     System.out.println(RelOptUtil.toString(physicalPlan));
     return compile(root, physicalPlan);
-    // Coding module II:
-    // TODO 1. Implement the LuceneTableScan operator according to the instructions in the class.
-    // TODO 2. Implement the LuceneTableScanRule operator according to the instructions in the class.
-    // TODO 3. Register the LuceneTableScanRule to the planner.
-    // TODO 4. Remove the EnumerableTableScanRule it is not needed anymore. This will lead to a
-    // CannotPlanException that will tackle next. Can you spot why?
-    // TODO 5. Got to LuceneToEnumerableConverter and try to understand what it does.
-    // TODO 6. Implement LuceneToEnumerableConverterRule according to the instuctions in the class.
-    // TODO 7. Register the LuceneToEnumerableConverterRule to the planner.
     // Coding module III:
     // TODO 1. Use the JdbcSchema class to create a data source for establishing connections to
     //  HyperSQL. You can find the appropriate url, username, etc., to use in DatasetLoader.
