@@ -60,3 +60,12 @@ print the input query to standard output.
 
 You can use one of the predefined queries under `queries/tpch` directory or create a new file
 and write your own.
+
+## More information
+
+* Slides: https://github.com/zabetak/slides/blob/b70590fe5fb36a092235b8867bd370e401193c9e/2022/cy-calcite-tutorial/building-query-compilers-using-apache-calcite.pdf
+* Questions: <a href="mailto:dev@calcite.apache.org">zabetak at gmail.com</a>, 
+  <a href="mailto:dev@calcite.apache.org">dev at calcite.apache.org</a>
+* Past Calcite tutorials: https://youtu.be/p1O3E33FIs8, https://youtu.be/meI0W12f_nw
+* Calcite research paper: https://arxiv.org/pdf/1802.10233.pdf
+* Lucene internals: https://youtu.be/T5RmMNDR5XI
