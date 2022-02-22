@@ -20,7 +20,7 @@ limitations under the License.
 
 A tutorial of [Apache Calcite]((http://calcite.apache.org))
 for the course of [Data Integration](https://depinfo.u-cergy.fr/~vodislav/Master/IED/) at the
-university of [Cergy-Pontoise](https://www.cyu.fr/).
+university of [CY Cergy Paris](https://www.cyu.fr/).
 
 In this tutorial, we demonstrate the main components of Calcite and how they interact with each
 other. To do this we build, step-by-step, a fully fledged query processor for data residing
